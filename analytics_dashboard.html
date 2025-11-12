@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>DigiPatho — Camp Analytics (Prototype)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --muted:#94a3b8; --accent:#06b6d4; --accent-2:#60a5fa;
+      --card-radius:10px; --gap:12px; --text:#e6eef8;
+    }
+    html,body{height:100%; margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial; background:linear-gradient(180deg,#071226 0%, #071826 100%); color:var(--text);}
+    .container{max-width:1200px; margin:18px auto; padding:18px;}
+    .top-row{display:flex; gap:var(--gap); margin-bottom:12px;}
+    .map-card{flex:1; min-height:260px; border-radius:var(--card-radius); overflow:hidden; background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); box-shadow: 0 6px 18px rgba(2,6,23,0.6); border:1px solid rgba(255,255,255,0.03);}
+    #map{height:260px;}
+    .right-column{width:360px; display:flex; flex-direction:column; gap:var(--gap);}
+    .kpi-row{display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
+    .kpi{flex:1; min-width:140px; background:var(--card); padding:14px; border-radius:8px; border:1px solid rgba(255,255,255,0.03); text-align:center;}
+    .kpi h3{margin:0; font-size:12px; color:var(--muted); font-weight:600;}
+    .kpi p{margin:6px 0 0; font-size:20px; font-weight:700;}
+    .controls{display:flex; gap:8px; align-items:center; margin-bottom:8px;}
+    .card{background:var(--card); padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.03);}
+    .grid{display:grid; grid-template-columns: 2fr 1fr; gap:12px; margin-top:12px;}
+    canvas{background:transparent;}
+    .leaderboard{max-height:240px; overflow:auto;}
+    table{width:100%; border-collapse:collapse; font-size:13px;}
+    th,td{padding:8px; text-align:left; border-bottom:1px dashed rgba(255,255,255,0.03);}
+    th{font-size:12px; color:var(--muted); font-weight:600;}
+    .btn{background:var(--accent); color:#022; border:none; padding:8px 10px; border-radius:6px; cursor:pointer; font-weight:700;}
+    .small{font-size:12px; color:var(--muted);}
+    .camp-panel{position:fixed; right:18px; top:18%; width:420px; max-width:92%; background:linear-gradient(180deg,#071226,#061827); border-radius:12px; padding:0; box-shadow:0 12px 40px rgba(2,6,23,0.8); border:1px solid rgba(255,255,255,0.04); display:none; z-index:999;}
+    .camp-panel h4{margin:0 0 6px;}
+    .drag-header{background:linear-gradient(90deg,#06b6d4,#0891b2); padding:6px 14px; border-radius:12px 12px 0 0; cursor:move; user-select:none; text-align:center; color:#fff; font-weight:600; font-size:12px;}
+    .drag-header:active{cursor:grabbing; background:linear-gradient(90deg,#0891b2,#0e7490);}
+    .camp-panel > div:not(.drag-header){padding:0 14px 14px 14px;}
+    .pill{display:inline-block; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:999px; font-size:12px; margin-right:6px;}
+    .muted{color:var(--muted);}
+    .legend{display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;}
+    .caveat{font-size:12px; color:#fffb; margin-top:10px; background:rgba(255,255,255,0.01); padding:8px; border-radius:6px;}
+    .top-nav{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.005)); padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.05); margin-bottom:0;}
+    .nav-center{max-width:1200px; margin:0 auto; display:flex; justify-content:center; gap:24px; flex-wrap:wrap; align-items:center; padding:0 18px;}
+    .nav-center a{color:var(--muted); text-decoration:none; font-weight:600; font-size:14px; padding:8px 12px; border-radius:6px; transition:color .2s ease, background .2s ease;}
+    .nav-center a:hover{color:var(--accent-2); background:rgba(96,165,250,0.08);}
+    .nav-center a.active{color:var(--accent); background:rgba(6,182,212,0.12); box-shadow:inset 0 -2px 0 var(--accent);}
+  </style>
+</head>
+<body>
+  <div class="top-nav">
+    <div class="nav-center">
+      <a href="#camp-analytics" class="active">Camp Analytics</a>
+      <a href="#disease-analytics">Disease Analytics</a>
+      <a href="#survey-analytics">Survey Analytics</a>
+      <a href="#sample-diagnostic">Sample & Diagnostic Analytics</a>
+      <a href="#operational">Operational Performance</a>
+      <a href="#impact-planning">Impact & Planning Insight</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h2 style="margin:0;">DigiPatho — Camp Analytics</h2>
+      <div style="display:flex;gap:12px;align-items:center;">
+        <div>
+          <select id="windowSelector" style="padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);background:#071226;color:var(--text);">
+            <option value="30">30 days</option>
+            <option value="60">60 days</option>
+            <option value="90" selected>90 days</option>
+          </select>
+        </div>
+        <button class="btn" id="refreshBtn">Refresh</button>
+      </div>
+    </div>
+
+    <!-- Filtering Controls -->
+    <div class="card" style="margin-bottom:16px; padding:16px;">
+      <div style="display:flex; gap:12px; align-items:end; flex-wrap:wrap;">
+        <div style="flex:1; min-width:150px;">
+          <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">District</label>
+          <select id="districtFilter" style="width:100%; padding:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.08); background:#071226; color:var(--text);">
+            <option value="all" selected>All</option>
+            <option value="wayanad">Wayanad</option>
+            <option value="thiruvananthapuram">Thiruvananthapuram</option>
+            <option value="kollam">Kollam</option>
+            <option value="pathanamthitta">Pathanamthitta</option>
+            <option value="alappuzha">Alappuzha</option>
+            <option value="kottayam">Kottayam</option>
+            <option value="idukki">Idukki</option>
+            <option value="ernakulam">Ernakulam</option>
+            <option value="thrissur">Thrissur</option>
+            <option value="palakkad">Palakkad</option>
+            <option value="malappuram">Malappuram</option>
+            <option value="kozhikode">Kozhikode</option>
+            <option value="kannur">Kannur</option>
+            <option value="kasaragod">Kasaragod</option>
+          </select>
+        </div>
+
+        <div style="flex:1; min-width:150px;">
+          <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">PHC/Hub</label>
+          <select id="hubFilter" style="width:100%; padding:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.08); background:#071226; color:var(--text);">
+            <option value="all" selected>All</option>
+            <option value="manathavady">Manathavady Hub</option>
+            <option value="kalpetta">Kalpetta Hub</option>
+            <option value="sulthan-bathery">Sulthan Bathery Hub</option>
+          </select>
+        </div>
+
+        <div style="flex:1; min-width:140px;">
+          <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">Date From</label>
+          <input type="date" id="dateFrom" style="width:100%; padding:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.08); background:#071226; color:var(--text);">
+        </div>
+
+        <div style="flex:1; min-width:140px;">
+          <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:600;">Date To</label>
+          <input type="date" id="dateTo" style="width:100%; padding:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.08); background:#071226; color:var(--text);">
+        </div>
+
+        <div>
+          <button class="btn" id="applyFilters" style="padding:9px 20px;">Apply</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI Cards at top -->
+    <div class="kpi-row" style="margin-bottom:12px;">
+      <div class="kpi">
+        <h3>Total Camps Conducted</h3>
+        <p id="kpiCamps">—</p>
+      </div>
+      <div class="kpi">
+        <h3>Total Screening Visits</h3>
+        <p id="kpiVisits">—</p>
+      </div>
+      <div class="kpi">
+        <h3>Total Samples Collected</h3>
+        <p id="kpiSamples">—</p>
+      </div>
+      <div class="kpi">
+        <h3>Total Positives (camp-linked)</h3>
+        <p id="kpiPositives">—</p>
+      </div>
+      <div class="kpi">
+        <h3>Referral Conversion Rate</h3>
+        <p id="kpiConversion">—</p>
+      </div>
+      <div class="kpi">
+        <h3>Median Referral Lag (days)</h3>
+        <p id="kpiLag">—</p>
+      </div>
+    </div>
+
+    <!-- top area: map left, leaderboard right -->
+    <div class="top-row">
+      <div class="map-card card">
+        <div id="map"></div>
+      </div>
+
+      <div class="right-column">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div class="small muted">Top Camps</div>
+              <div style="font-weight:700;margin-top:6px;">Leaderboards</div>
+            </div>
+            <div class="small muted">sortable</div>
+          </div>
+          <div class="leaderboard" id="leaderboard" style="margin-top:8px;"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- left: charts -->
+      <div>
+        <div class="card" style="margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div class="small muted">Camp-wise Screening Volume</div>
+              <div style="font-weight:700;margin-top:6px;">Camp-wise Person Count</div>
+            </div>
+            <div class="small muted">Click bar → camp detail</div>
+          </div>
+          <div style="height:180px;margin-top:12px;"><canvas id="barChart"></canvas></div>
+        </div>
+
+        <div style="display:flex;gap:12px;">
+          <div class="card" style="flex:1;">
+            <div class="small muted">Referral → Attendance (program-level)</div>
+            <div style="font-weight:700;margin-top:6px;">Conversion Funnel</div>
+            <div style="height:220px;margin-top:12px;"><canvas id="funnelChart"></canvas></div>
+            <div class="caveat">Conversion is program-level cohort: advised (survey) → attended any camp within selected window → screened → diagnosed.</div>
+          </div>
+
+          <div class="card" style="width:360px;">
+            <div class="small muted">Referral-to-Attendance Lag</div>
+            <div style="font-weight:700;margin-top:6px;">Lag Distribution (days)</div>
+            <div style="height:200px;margin-top:12px;"><canvas id="lagChart"></canvas></div>
+            <div class="small muted" style="margin-top:8px;">Median / IQR shown in KPI row</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- right: small summary -->
+      <div>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div><div class="small muted">Conversion by Hub</div><div style="font-weight:700;margin-top:6px;">Hub Distribution</div></div>
+            <div class="small muted">Sankey-style</div>
+          </div>
+          <div id="hubBars" style="margin-top:12px;"></div>
+        </div>
+
+        <div class="card" style="margin-top:12px;">
+          <div class="small muted">Operational</div>
+          <div style="font-weight:700;margin-top:6px;">Summary</div>
+          <table style="margin-top:8px;">
+            <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td class="muted">Avg persons / camp</td><td id="avgPerCamp">—</td></tr>
+              <tr><td class="muted">Median TAT (days)</td><td id="medianTAT">—</td></tr>
+              <tr><td class="muted">P95 TAT (days)</td><td id="p95TAT">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="camp-panel" id="campPanel">
+      <div class="drag-header" id="dragHeader">
+        <span>Camp Data</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <h4 id="cpName">Camp Name</h4>
+          <div class="small muted" id="cpHub">Hub • Date</div>
+        </div>
+        <div><button class="btn" id="closePanel">Close</button></div>
+      </div>
+
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+        <div class="pill"><strong id="cpVisits">0</strong> visits</div>
+        <div class="pill"><strong id="cpSamples">0</strong> samples</div>
+        <div class="pill"><strong id="cpPos">0</strong> positives</div>
+        <div class="pill"><strong id="cpTAT">—</strong> median TAT d</div>
+      </div>
+
+      <div style="margin-top:10px;">
+        <div style="font-size:14px; font-weight:700; color:var(--accent); margin-bottom:8px;">Disease breakdown</div>
+        <div id="cpBreakdown" style="margin-top:6px;"></div>
+
+        <div style="margin-top:10px;">
+          <div style="font-size:14px; font-weight:700; color:var(--accent); margin-bottom:8px;">Camp funnel</div>
+          <div style="margin-top:6px; font-size:13px; line-height:1.8;">
+            <div>Registered: <strong id="cpReg">—</strong> <span class="small muted" id="cpRegBreakdown"></span></div>
+            <div>Screened: <strong id="cpScr">—</strong></div>
+            <div>Samples: <strong id="cpSm">—</strong></div>
+            <div>Reported: <strong id="cpRp">—</strong></div>
+          </div>
+        </div>
+
+        <div class="caveat" style="margin-top:10px;">
+          Note: This panel shows camp-level aggregates only. No person-level roster is displayed in this prototype.
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    // --------------------------
+    // Mock camp-level aggregated data
+    // Replace with real aggregated data in integration
+    const mockCamps = [
+      { camp_id: 'C001', name:'Camp - Poovanchal', hub:'Manathavady', lsg:'Panchayat A', date_start:'2025-10-05', date_end:'2025-10-05', lat:11.8, lon:76.0,
+        visits: 142, samples: 120, positives: 9, median_tat: 7, p95_tat: 18, advised: 240, advised_converted_within_90: 102, referral_lags: [5,7,3,10,14,40,2,3,60,20]
+      },
+      { camp_id: 'C002', name:'Camp - Kunnu', hub:'Sultan Bathery', lsg:'Ward 3', date_start:'2025-10-12', date_end:'2025-10-12', lat:11.7, lon:76.3,
+        visits: 86, samples: 70, positives: 6, median_tat: 6, p95_tat: 14, advised: 90, advised_converted_within_90: 40, referral_lags: [2,5,6,15,8,25,7,1]
+      },
+      { camp_id: 'C003', name:'Camp - Thiruvampady', hub:'Kalpetta', lsg:'Ward 7', date_start:'2025-09-28', date_end:'2025-09-28', lat:11.6, lon:76.2,
+        visits: 210, samples: 200, positives: 18, median_tat: 5, p95_tat: 12, advised: 320, advised_converted_within_90: 160, referral_lags: [1,2,3,4,6,7,8,30,40,60,90]
+      },
+      { camp_id: 'C004', name:'Camp - Vythiri', hub:'Manathavady', lsg:'Colony X', date_start:'2025-11-01', date_end:'2025-11-01', lat:11.9, lon:76.05,
+        visits: 38, samples: 30, positives: 2, median_tat: 9, p95_tat: 22, advised: 50, advised_converted_within_90: 15, referral_lags: [7,15,20,45]
+      },
+      { camp_id: 'C005', name:'Camp - Ambalavayal', hub:'Kalpetta', lsg:'Ward 2', date_start:'2025-10-20', date_end:'2025-10-20', lat:11.58, lon:76.18,
+        visits: 164, samples: 150, positives: 13, median_tat: 6, p95_tat: 16, advised: 200, advised_converted_within_90: 88, referral_lags: [2,3,4,10,20,55,3,2,6,6,7]
+      }
+    ];
+
+    // Utilities
+    function sum(arr, key){ return arr.reduce((s,i)=>s+(i[key]||0),0); }
+    function median(arr){
+      const a = [...arr].sort((x,y)=>x-y);
+      if(a.length===0) return null;
+      const mid = Math.floor(a.length/2);
+      return a.length%2 ? a[mid] : (a[mid-1]+a[mid])/2;
+    }
+    function percentile(a, p){
+      if(!a.length) return null;
+      const s=[...a].sort((x,y)=>x-y);
+      const idx = Math.min(s.length-1, Math.max(0, Math.round((p/100)*(s.length-1))));
+      return s[idx];
+    }
+
+    // Map init
+    const map = L.map('map', { zoomControl:true }).setView([11.75, 76.18], 11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // markers
+    const markers = {};
+    function renderMarkers(){
+      mockCamps.forEach(c=>{
+        const color = c.positives / Math.max(1,c.visits) > 0.06 ? 'red' : (c.positives>0 ? 'orange' : 'green');
+        const size = Math.min(50, 12 + Math.sqrt(c.visits));
+        const html = `<div style="background:${color}; width:${size}px; height:${size}px; border-radius:50%; display:flex;align-items:center;justify-content:center; color:white; font-weight:700; box-shadow:0 6px 12px rgba(0,0,0,0.5)">${c.visits}</div>`;
+        const icon = L.divIcon({ html, className:'camp-pin', iconSize:[size,size], popupAnchor:[0,-size/2] });
+        const m = L.marker([c.lat,c.lon], { icon }).addTo(map);
+        m.on('click', ()=>openCampPanel(c.camp_id));
+        m.bindPopup(`<strong>${c.name}</strong><br>${c.hub}<br>Visits: ${c.visits}<br>Positives: ${c.positives}<br>Median TAT: ${c.median_tat} d`);
+        markers[c.camp_id] = m;
+      });
+    }
+
+    // Chart building
+    let barChart=null, funnelChart=null, lagChart=null;
+
+    function computeKPIs(windowDays){
+      const totalCamps = mockCamps.length;
+      const totalVisits = sum(mockCamps, 'visits');
+      const totalSamples = sum(mockCamps, 'samples');
+      const totalPos = sum(mockCamps, 'positives');
+      // conversion: sum advised and attending within window
+      const totalAdvised = sum(mockCamps, 'advised');
+      const totalConverted = sum(mockCamps, 'advised_converted_within_90'); // mock field uses 90d; in real data compute per window
+      // compute referral lag median
+      const allLags = mockCamps.flatMap(c => c.referral_lags || []);
+      const medLag = median(allLags);
+      // median/p95 TAT across samples
+      const allTATs = mockCamps.flatMap(c => Array(Math.max(1, c.samples)).fill(c.median_tat)); // mock: use median per camp
+      const p50TAT = median(allTATs);
+      const p95TAT = percentile(allTATs,95);
+
+      return {
+        totalCamps, totalVisits, totalSamples, totalPos,
+        conversionPct: totalAdvised? Math.round((totalConverted/totalAdvised)*10000)/100 : 0,
+        medLag: medLag||0, p50TAT: p50TAT||0, p95TAT:p95TAT||0,
+        totalAdvised, totalConverted
+      };
+    }
+
+    function renderKPIs(){
+      const windowDays = Number(document.getElementById('windowSelector').value);
+      // NOTE: mock uses 90d field; in a real backend recompute per window. Here we adapt roughly:
+      const data = computeKPIs(windowDays);
+      document.getElementById('kpiCamps').innerText = data.totalCamps;
+      document.getElementById('kpiVisits').innerText = data.totalVisits;
+      document.getElementById('kpiSamples').innerText = data.totalSamples;
+      document.getElementById('kpiPositives').innerText = data.totalPos;
+      document.getElementById('kpiConversion').innerText = (data.conversionPct || 0) + '%';
+      document.getElementById('kpiLag').innerText = data.medLag + ' d';
+      document.getElementById('medianTAT').innerText = (data.p50TAT || '—');
+      document.getElementById('p95TAT').innerText = (data.p95TAT || '—');
+      document.getElementById('avgPerCamp').innerText = (data.totalVisits / Math.max(1,data.totalCamps)).toFixed(1);
+      document.getElementById('kpiSamples').innerText = data.totalSamples;
+    }
+
+    function renderLeaderboard(){
+      const lb = document.getElementById('leaderboard');
+      lb.innerHTML='';
+      // sort by visits desc
+      const sorted = [...mockCamps].sort((a,b)=>b.visits-a.visits);
+      const table = document.createElement('table');
+      table.innerHTML = `<thead><tr><th>Camp</th><th class="muted">Visits</th><th class="muted">Positives</th></tr></thead>`;
+      const body = document.createElement('tbody');
+      sorted.forEach(c=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td style="cursor:pointer;color:var(--accent);">${c.name}</td><td>${c.visits}</td><td>${c.positives}</td>`;
+        tr.querySelector('td').addEventListener('click', ()=>{ openCampPanel(c.camp_id); map.setView([c.lat,c.lon],13); });
+        body.appendChild(tr);
+      });
+      table.appendChild(body);
+      lb.appendChild(table);
+    }
+
+    function renderBarChart(){
+      const ctx = document.getElementById('barChart').getContext('2d');
+      const labels = mockCamps.map(c=>c.name);
+      const data = mockCamps.map(c=>c.visits);
+      if(barChart) barChart.destroy();
+      barChart = new Chart(ctx, {
+        type:'bar',
+        data:{ labels, datasets:[{ label:'Visits', data, backgroundColor: 'rgba(96,165,250,0.85)', barThickness: 40 }]},
+        options:{
+          responsive:true, 
+          maintainAspectRatio:false,
+          onClick: (evt)=>{
+            const points = barChart.getElementsAtEventForMode(evt,'nearest',{intersect:true},false);
+            if(points.length) openCampPanel(mockCamps[points[0].index].camp_id);
+          },
+          scales:{ 
+            y:{ 
+              beginAtZero:true, 
+              max: Math.max(...data) * 1.2,
+              ticks:{ color:'#94a3b8', stepSize: 50 }, 
+              grid:{ color:'rgba(255,255,255,0.05)' } 
+            },
+            x:{ ticks:{ color:'#94a3b8', maxRotation: 45, minRotation: 0 }, grid:{ display:false } }
+          },
+          plugins:{ legend:{ labels:{ color:'#94a3b8' } } }
+        }
+      });
+    }
+
+    function renderFunnel(){
+      // horizontal bar chart with stacked "Attended" bar
+      const ctx = document.getElementById('funnelChart').getContext('2d');
+      // compute totals from mock
+      const totalAdvised = sum(mockCamps,'advised');
+      const totalConverted = sum(mockCamps,'advised_converted_within_90');
+      const totalScreened = sum(mockCamps,'visits');
+      const totalDiagnosed = sum(mockCamps,'positives');
+      
+      // Split Attended into Survey-Referred and Walk-In (mock: 70% referred, 30% walk-in)
+      const attendedReferred = Math.round(totalConverted * 0.7);
+      const attendedWalkIn = totalConverted - attendedReferred;
+      
+      const maxVal = Math.max(totalAdvised,totalConverted,totalScreened,totalDiagnosed);
+      if(funnelChart) funnelChart.destroy();
+      funnelChart = new Chart(ctx, {
+        type:'bar',
+        data:{ 
+          labels:['Advised','Attended (window)','Screened','Diagnosed'], 
+          datasets:[
+            {
+              label: 'Survey-Referred',
+              data:[totalAdvised, attendedReferred, totalScreened, totalDiagnosed], 
+              backgroundColor:'#60a5fa',
+              barThickness: 35
+            },
+            {
+              label: 'Walk-In',
+              data:[0, attendedWalkIn, 0, 0], 
+              backgroundColor:'#10b981',
+              barThickness: 35
+            }
+          ]
+        },
+        options:{ 
+          indexAxis:'y', 
+          responsive:true,
+          maintainAspectRatio:false,
+          plugins:{ 
+            legend:{
+              display:true,
+              position:'bottom',
+              labels:{ 
+                color:'#94a3b8',
+                usePointStyle: true,
+                pointStyle: 'rect',
+                padding: 15,
+                filter: function(item) {
+                  return item.text === 'Survey-Referred' || item.text === 'Walk-In';
+                }
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  let label = context.dataset.label || '';
+                  if (label) {
+                    label += ': ';
+                  }
+                  if (context.parsed.x !== null) {
+                    label += context.parsed.x;
+                  }
+                  return label;
+                }
+              }
+            }
+          }, 
+          scales:{ 
+            x:{ 
+              stacked: true,
+              beginAtZero:true, 
+              max: maxVal * 1.15,
+              ticks:{ color:'#94a3b8', stepSize: 100 }, 
+              grid:{ color:'rgba(255,255,255,0.05)' } 
+            },
+            y:{ 
+              stacked: true,
+              ticks:{ color:'#94a3b8' }, 
+              grid:{ display:false } 
+            }
+          } 
+        }
+      });
+    }
+
+    function renderLagChart(){
+      const ctx = document.getElementById('lagChart').getContext('2d');
+      const allLags = mockCamps.flatMap(c=>c.referral_lags||[]);
+      // histogram bins
+      const max = Math.max(...allLags,10);
+      const bins=8; const step = Math.ceil(max/bins);
+      const counts = Array(bins).fill(0);
+      allLags.forEach(v=>{ const idx=Math.min(bins-1, Math.floor(v/step)); counts[idx]++; });
+      const labels = counts.map((_,i)=>`${i*step}-${(i+1)*step}d`);
+      const maxCount = Math.max(...counts, 1);
+      if(lagChart) lagChart.destroy();
+      lagChart = new Chart(ctx, { 
+        type:'bar', 
+        data:{ 
+          labels, 
+          datasets:[{ 
+            label:'Count',
+            data:counts, 
+            backgroundColor:'rgba(6,182,212,0.85)',
+            barThickness: 30
+          }]
+        }, 
+        options:{ 
+          responsive:true,
+          maintainAspectRatio:false,
+          plugins:{legend:{display:false}}, 
+          scales:{ 
+            y:{ 
+              beginAtZero:true, 
+              max: maxCount * 1.2,
+              ticks:{ color:'#94a3b8', stepSize: Math.max(1, Math.ceil(maxCount/5)) }, 
+              grid:{ color:'rgba(255,255,255,0.05)' } 
+            },
+            x:{ ticks:{ color:'#94a3b8', maxRotation: 45, minRotation: 0 }, grid:{ display:false } }
+          } 
+        }
+      });
+    }
+
+    function renderHubBars(){
+      // aggregated conversion by hub (mock: compute sums)
+      const hubMap = {};
+      mockCamps.forEach(c=>{
+        if(!hubMap[c.hub]) hubMap[c.hub]={advised:0,converted:0}; 
+        hubMap[c.hub].advised += c.advised||0;
+        hubMap[c.hub].converted += c.advised_converted_within_90||0;
+      });
+      const container = document.getElementById('hubBars');
+      container.innerHTML='';
+      Object.keys(hubMap).forEach(h=>{
+        const d = hubMap[h];
+        const pct = d.advised? Math.round(d.converted*10000/d.advised)/100 : 0;
+        const row = document.createElement('div');
+        row.style.display='flex'; row.style.justifyContent='space-between'; row.style.alignItems='center'; row.style.marginBottom='8px';
+        row.innerHTML = `<div><div style="font-weight:700">${h}</div><div class="small muted">${d.advised} advised</div></div><div style="text-align:right"><div style="font-weight:800">${pct}%</div><div class="small muted">converted</div></div>`;
+        container.appendChild(row);
+        const bar = document.createElement('div'); bar.style.height='8px'; bar.style.width='100%'; bar.style.background='rgba(255,255,255,0.03)'; bar.style.borderRadius='6px'; bar.style.marginTop='6px';
+        const inner = document.createElement('div'); inner.style.height='8px'; inner.style.width=(pct)+'%'; inner.style.background='linear-gradient(90deg,#06b6d4,#60a5fa)'; inner.style.borderRadius='6px';
+        bar.appendChild(inner); container.appendChild(bar);
+      });
+    }
+
+    // Camp panel
+    function openCampPanel(campId){
+      const c = mockCamps.find(x=>x.camp_id===campId);
+      if(!c) return;
+      document.getElementById('cpName').innerText = c.name;
+      document.getElementById('cpHub').innerText = `${c.hub} • ${c.date_start}`;
+      document.getElementById('cpVisits').innerText = c.visits;
+      document.getElementById('cpSamples').innerText = c.samples;
+      document.getElementById('cpPos').innerText = c.positives;
+      document.getElementById('cpTAT').innerText = c.median_tat;
+      // breakdown (mock)
+      document.getElementById('cpBreakdown').innerHTML = `<div class="small muted">Cervical: ${Math.round(c.visits*0.4)} • Oral: ${Math.round(c.visits*0.35)} • Breast: ${Math.round(c.visits*0.25)}</div>`;
+      
+      // Camp funnel - only Registered has breakdown (mock data - replace with real data)
+      const regTotal = Math.round(c.visits*1.05);
+      const regReferred = Math.round(c.advised_converted_within_90 || c.visits*0.7);
+      const regNew = regTotal - regReferred;
+      document.getElementById('cpReg').innerText = regTotal;
+      document.getElementById('cpRegBreakdown').innerText = `(Survey-Referred: ${regReferred}; New: ${regNew})`;
+      
+      document.getElementById('cpScr').innerText = c.visits;
+      document.getElementById('cpSm').innerText = c.samples;
+      document.getElementById('cpRp').innerText = Math.round(c.samples*0.85);
+      document.getElementById('campPanel').style.display='block';
+    }
+    document.getElementById('closePanel').addEventListener('click', ()=>document.getElementById('campPanel').style.display='none');
+
+    // Make panel draggable
+    let isDragging = false;
+    let currentX, currentY, initialX, initialY;
+    const panel = document.getElementById('campPanel');
+    const dragHeader = document.getElementById('dragHeader');
+
+    dragHeader.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      initialX = e.clientX - (parseInt(panel.style.left) || 0);
+      initialY = e.clientY - (parseInt(panel.style.top) || 0);
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        e.preventDefault();
+        currentX = e.clientX - initialX;
+        currentY = e.clientY - initialY;
+        panel.style.left = currentX + 'px';
+        panel.style.top = currentY + 'px';
+        panel.style.right = 'auto';
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    // initial render
+    renderMarkers();
+    renderKPIs();
+    renderLeaderboard();
+    renderBarChart();
+    renderFunnel();
+    renderLagChart();
+    renderHubBars();
+
+    document.getElementById('refreshBtn').addEventListener('click', ()=>{
+      renderKPIs();
+      renderBarChart();
+      renderFunnel();
+      renderLagChart();
+      renderHubBars();
+    });
+
+    // Apply filters handler
+    document.getElementById('applyFilters').addEventListener('click', ()=>{
+      const district = document.getElementById('districtFilter').value;
+      const hub = document.getElementById('hubFilter').value;
+      const dateFrom = document.getElementById('dateFrom').value;
+      const dateTo = document.getElementById('dateTo').value;
+      
+      console.log('Filters applied:', { district, hub, dateFrom, dateTo });
+      
+      // TODO: Filter mockCamps data based on selected filters
+      // For now, just refresh the visualizations
+      renderKPIs();
+      renderBarChart();
+      renderFunnel();
+      renderLagChart();
+      renderHubBars();
+      renderMarkers();
+      renderLeaderboard();
+    });
+
+    // small responsive
+    window.addEventListener('resize', ()=>{ if(barChart) barChart.resize(); if(funnelChart) funnelChart.resize(); if(lagChart) lagChart.resize(); });
+
+  </script>
+</body>
+</html>
