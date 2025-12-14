@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>DigiPatho — Disease Analytics (Prototype)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    :root{
+      --card:#0b1220; --muted:#94a3b8; --accent:#06b6d4; --accent-2:#60a5fa;
+      --text:#e6eef8;
+    }
+    html,body{margin:0; font-family:Inter,system-ui; background:linear-gradient(180deg,#071226,#071826); color:var(--text);}
+    .container{max-width:1200px; margin:18px auto; padding:18px;}
+    .card{background:var(--card); padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.04);}
+    .kpi-row{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;}
+    .kpi{flex:1; min-width:150px; background:var(--card); padding:14px; border-radius:8px; text-align:center;}
+    .kpi h3{margin:0; font-size:12px; color:var(--muted);}
+    .kpi p{margin:6px 0 0; font-size:20px; font-weight:700;}
+    .grid{display:grid; grid-template-columns:2fr 1fr; gap:12px;}
+    .top-nav{padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.05);}
+    .nav-center{display:flex; justify-content:center; gap:24px;}
+    .nav-center a{color:var(--muted); text-decoration:none; font-weight:600;}
+    .nav-center a.active{color:var(--accent);}
+    .small{font-size:12px; color:var(--muted);}
+    canvas{background:transparent;}
+    #map{height:260px;}
+  </style>
+</head>
+<body>
+
+<div class="top-nav">
+  <div class="nav-center">
+    <a href="#">Camp Analytics</a>
+    <a href="#" class="active">Disease Analytics</a>
+    <a href="#">Survey Analytics</a>
+    <a href="#">Sample & Diagnostic Analytics</a>
+    <a href="#">Operational Performance</a>
+    <a href="#">Impact & Planning</a>
+  </div>
+</div>
+
+<div class="container">
+  <h2>DigiPatho — Disease Analytics</h2>
+
+  <div class="card" style="margin-bottom:12px;">
+    <div style="display:flex; gap:12px; flex-wrap:wrap;">
+      <select><option>All Districts</option></select>
+      <select><option>All Hubs</option></select>
+      <select>
+        <option selected>All Diseases</option>
+        <option>Cervical</option>
+        <option>Oral</option>
+        <option>Breast</option>
+      </select>
+      <input type="date"/>
+      <input type="date"/>
+    </div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi"><h3>Total Screened</h3><p id="kpiScreened">—</p></div>
+    <div class="kpi"><h3>Total Diagnosed</h3><p id="kpiDiagnosed">—</p></div>
+    <div class="kpi"><h3>Positivity Rate</h3><p id="kpiPositivity">—</p></div>
+    <div class="kpi"><h3>Median TAT (days)</h3><p>6</p></div>
+    <div class="kpi"><h3>P95 TAT (days)</h3><p>15</p></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="small">Geographic Disease Distribution</div>
+      <div id="map"></div>
+    </div>
+    <div class="card">
+      <div class="small">Disease Distribution</div>
+      <canvas id="diseaseChart" height="260"></canvas>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:12px;">
+    <div class="small">Camp-wise comparison</div>
+    <div style="font-weight:700;margin-top:6px;">Camp-wise Disease Positivity Rate (%)</div>
+    <div style="height:260px;margin-top:12px;">
+      <canvas id="campDiseasePositivity"></canvas>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:12px;">
+    <div class="card">
+      <div class="small">Disease Trend Over Time</div>
+      <canvas id="trendChart" height="220"></canvas>
+    </div>
+    <div class="card">
+      <div class="small">TAT Distribution (days)</div>
+      <canvas id="tatChart" height="220"></canvas>
+      <div class="small" style="margin-top:6px;">Median / IQR shown in KPI row</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+  const diseaseData = {
+    Cervical: { screened: 420, diagnosed: 38 },
+    Oral: { screened: 350, diagnosed: 29 },
+    Breast: { screened: 280, diagnosed: 21 }
+  };
+
+  const totalScreened = Object.values(diseaseData).reduce((s,d)=>s+d.screened,0);
+  const totalDiagnosed = Object.values(diseaseData).reduce((s,d)=>s+d.diagnosed,0);
+
+  document.getElementById('kpiScreened').innerText = totalScreened;
+  document.getElementById('kpiDiagnosed').innerText = totalDiagnosed;
+  document.getElementById('kpiPositivity').innerText = ((totalDiagnosed/totalScreened)*100).toFixed(1)+'%';
+
+  new Chart(document.getElementById('diseaseChart'),{
+    type:'doughnut',
+    data:{
+      labels:Object.keys(diseaseData),
+      datasets:[{data:Object.values(diseaseData).map(d=>d.screened),
+        backgroundColor:['#60a5fa','#34d399','#fbbf24']}]
+    },
+    options:{plugins:{legend:{labels:{color:'#94a3b8'}}}}
+  });
+
+  new Chart(document.getElementById('trendChart'),{
+    type:'line',
+    data:{
+      labels:['Jul','Aug','Sep','Oct','Nov'],
+      datasets:[
+        {label:'Cervical', data:[60,80,90,100,90], borderColor:'#60a5fa'},
+        {label:'Oral', data:[50,70,60,80,90], borderColor:'#34d399'},
+        {label:'Breast', data:[40,50,60,70,60], borderColor:'#fbbf24'}
+      ]
+    },
+    options:{plugins:{legend:{labels:{color:'#94a3b8'}}},
+      scales:{x:{ticks:{color:'#94a3b8'}},y:{ticks:{color:'#94a3b8'}}}}
+  });
+
+  new Chart(document.getElementById('tatChart'),{
+    type:'bar',
+    data:{
+      labels:['0-3','4-6','7-10','11-15','15+'],
+      datasets:[{data:[120,200,80,40,20], backgroundColor:'#06b6d4'}]
+    },
+    options:{plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#94a3b8'}},y:{ticks:{color:'#94a3b8'}}}}
+  });
+
+  new Chart(document.getElementById('campDiseasePositivity'),{
+    type:'bar',
+    data:{
+      labels:['Poovanchal','Kunnu','Thiruvampady','Ambalavayal'],
+      datasets:[
+        {label:'Cervical', data:[6.2,4.1,7.5,5.8], backgroundColor:'#60a5fa'},
+        {label:'Oral', data:[8.4,6.9,9.2,7.1], backgroundColor:'#34d399'},
+        {label:'Breast', data:[4.8,3.2,5.6,4.1], backgroundColor:'#fbbf24'}
+      ]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      scales:{
+        y:{beginAtZero:true, ticks:{color:'#94a3b8', callback:v=>v+'%'}},
+        x:{ticks:{color:'#94a3b8'}}
+      },
+      plugins:{legend:{position:'bottom', labels:{color:'#94a3b8'}}}
+    }
+  });
+
+  const map = L.map('map').setView([11.75,76.18],11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);
+  L.marker([11.7,76.2]).addTo(map).bindPopup('Kalpetta<br>Positivity: 6.5%');
+  L.marker([11.8,76.0]).addTo(map).bindPopup('Mananthavady<br>Positivity: 7.2%');
+</script>
+</body>
+</html>
