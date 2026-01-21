@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>DigiPatho — Survey Analytics (Full Prototype)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    :root{
+      --card:#0b1220; --muted:#94a3b8; --accent:#06b6d4; --accent-2:#60a5fa;
+      --text:#e6eef8;
+    }
+    html,body{
+      margin:0; font-family:Inter,system-ui;
+      background:linear-gradient(180deg,#071226,#071826);
+      color:var(--text);
+    }
+    .container{max-width:1200px; margin:18px auto; padding:18px;}
+    .card{background:var(--card); padding:14px; border-radius:8px;
+          border:1px solid rgba(255,255,255,0.04);}
+    .kpi-row{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;}
+    .kpi{flex:1; min-width:160px; background:var(--card);
+         padding:14px; border-radius:8px; text-align:center;}
+    .kpi h3{margin:0; font-size:12px; color:var(--muted);}
+    .kpi p{margin:6px 0 0; font-size:22px; font-weight:700;}
+    .grid{display:grid; grid-template-columns:2fr 1fr; gap:14px;}
+    .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+    .top-nav{padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.05);}
+    .nav-center{display:flex; justify-content:center; gap:24px;}
+    .nav-center a{color:var(--muted); text-decoration:none; font-weight:600;}
+    .nav-center a.active{color:var(--accent);}
+    .small{font-size:12px; color:var(--muted);}
+    canvas{background:transparent;}
+    #map{height:280px;}
+  </style>
+</head>
+<body>
+
+<div class="top-nav">
+  <div class="nav-center">
+    <a href="analytics_dashboard.html">Camp Analytics</a>
+    <a href="disease_analytics_dashboard.html">Disease Analytics</a>
+    <a href="#" class="active">Survey Analytics</a>
+    <a href="sample_diagnostic_analytics_dashboard.html">Sample & Diagnostic</a>
+    <a href="operational_performance_dashboard.html">Operational</a>
+    <a href="impact_planning_dashboard.html">Impact & Planning</a>
+  </div>
+</div>
+
+<div class="container">
+  <h2>DigiPatho — Survey Analytics</h2>
+
+  <!-- KPI ROW -->
+  <div class="kpi-row">
+    <div class="kpi"><h3>Households Surveyed</h3><p>1,240</p></div>
+    <div class="kpi"><h3>Individuals Surveyed</h3><p>4,980</p></div>
+    <div class="kpi"><h3>≥1 Risk Indicator</h3><p>1,920</p></div>
+    <div class="kpi"><h3>High-Risk Identified</h3><p>860</p></div>
+    <div class="kpi"><h3>Referred to Camp</h3><p>820</p></div>
+    <div class="kpi"><h3>Referral Conversion Rate</h3><p>62%</p></div>
+  </div>
+
+  <!-- MAP + RISK CLASSIFICATION -->
+  <div class="grid">
+    <div class="card">
+      <div class="small">Survey Coverage & Risk Hotspots</div>
+      <div id="map"></div>
+    </div>
+    <div class="card">
+      <div class="small">Risk Classification Overview</div>
+      <canvas id="riskChart" height="260"></canvas>
+    </div>
+  </div>
+
+  <!-- SYSTEM LEVEL RISK -->
+  <div class="card" style="margin-top:14px;">
+    <div class="small">Individuals Flagged by Health System</div>
+    <canvas id="systemChart" height="260"></canvas>
+  </div>
+
+  <!-- LOCATION WISE CONVERSION -->
+  <div class="card" style="margin-top:14px;">
+    <div class="small">Location-wise Referral Conversion Rate (%)</div>
+    <canvas id="locationChart" height="240"></canvas>
+  </div>
+
+  <!-- FUNNEL + LAG -->
+  <div class="grid-2" style="margin-top:14px;">
+    <div class="card">
+      <div class="small">Survey → Camp Conversion Funnel</div>
+      <canvas id="funnelChart" height="240"></canvas>
+      <div class="small">Conversion is program-level cohort; attendance may occur at any camp.</div>
+    </div>
+    <div class="card">
+      <div class="small">Referral-to-Attendance Lag Distribution (days)</div>
+      <canvas id="lagChart" height="240"></canvas>
+      <div class="small">Median / IQR shown in KPI row</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+  // Risk Classification
+  new Chart(riskChart,{
+    type:'doughnut',
+    data:{
+      labels:['No Risk','Moderate Risk','High Risk'],
+      datasets:[{data:[3060,1060,860],
+        backgroundColor:['#22c55e','#facc15','#ef4444']}]
+    }
+  });
+
+  // System Risk
+  new Chart(systemChart,{
+    type:'bar',
+    data:{
+      labels:['Lifestyle','Oral','Breast','Uterine','Chronic','Respiratory','Mental','Eye','Genetic'],
+      datasets:[{data:[1240,980,420,360,760,410,210,530,140],
+        backgroundColor:'#60a5fa'}]
+    },
+    options:{plugins:{legend:{display:false}}}
+  });
+
+  // Location Conversion
+  new Chart(locationChart,{
+    type:'bar',
+    data:{
+      labels:['Panchayat A','Panchayat B','Ward 7','Ward 9'],
+      datasets:[{data:[68,54,72,49], backgroundColor:'#06b6d4'}]
+    },
+    options:{
+      plugins:{legend:{display:false}},
+      scales:{y:{ticks:{callback:v=>v+'%'}}}
+    }
+  });
+
+  // Funnel
+  new Chart(funnelChart,{
+    type:'bar',
+    data:{
+      labels:['Surveyed','≥1 Risk','High-Risk','Referred','Attended'],
+      datasets:[{data:[4980,1920,860,820,510], backgroundColor:'#06b6d4'}]
+    },
+    options:{indexAxis:'y', plugins:{legend:{display:false}}}
+  });
+
+  // Lag
+  new Chart(lagChart,{
+    type:'bar',
+    data:{
+      labels:['0–7','8–14','15–30','31–60','60+'],
+      datasets:[{data:[220,160,90,30,10], backgroundColor:'#34d399'}]
+    },
+    options:{plugins:{legend:{display:false}}}
+  });
+
+  // MAP
+  const map = L.map('map').setView([11.75,76.18],11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+  const points=[
+    {name:'Kalpetta',lat:11.7,lon:76.2,surveyed:920,high:180},
+    {name:'Mananthavady',lat:11.8,lon:76.0,surveyed:760,high:210}
+  ];
+
+  points.forEach(p=>{
+    const pct=((p.high/p.surveyed)*100).toFixed(1);
+    L.marker([p.lat,p.lon]).addTo(map)
+      .bindPopup(`<b>${p.name}</b><br>
+        Individuals surveyed: ${p.surveyed}<br>
+        High-risk count: ${p.high}<br>
+        High-risk %: ${pct}%`);
+  });
+</script>
+
+</body>
+</html>
