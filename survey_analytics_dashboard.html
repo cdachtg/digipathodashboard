@@ -32,6 +32,18 @@
     .small{font-size:12px; color:var(--muted);}
     canvas{background:transparent;}
     #map{height:280px;}
+    select,input{
+      background:#071226; color:var(--text);
+      border:1px solid rgba(255,255,255,0.15);
+      padding:8px; border-radius:6px;
+    }
+    .filter-bar{
+      display:flex; gap:12px; flex-wrap:wrap; align-items:end;
+      margin-bottom:14px;
+    }
+    .filter-group label{
+      font-size:12px; color:var(--muted); display:block; margin-bottom:4px;
+    }
   </style>
 </head>
 <body>
@@ -50,8 +62,36 @@
 <div class="container">
   <h2>DigiPatho — Survey Analytics</h2>
 
+  <!-- FILTERS -->
+  <div class="card">
+    <div class="filter-bar">
+      <div class="filter-group">
+        <label>District</label>
+        <select>
+          <option value="all">All Districts</option>
+          <option>Wayanad</option>
+          <option>Kozhikode</option>
+          <option>Kannur</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Date From</label>
+        <input type="date" />
+      </div>
+      <div class="filter-group">
+        <label>Date To</label>
+        <input type="date" />
+      </div>
+      <div class="filter-group">
+        <button style="padding:9px 18px; background:var(--accent); border:none; border-radius:6px; font-weight:700; cursor:pointer;">
+          Apply
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- KPI ROW -->
-  <div class="kpi-row">
+  <div class="kpi-row" style="margin-top:14px;">
     <div class="kpi"><h3>Households Surveyed</h3><p>1,240</p></div>
     <div class="kpi"><h3>Individuals Surveyed</h3><p>4,980</p></div>
     <div class="kpi"><h3>≥1 Risk Indicator</h3><p>1,920</p></div>
@@ -60,7 +100,7 @@
     <div class="kpi"><h3>Referral Conversion Rate</h3><p>62%</p></div>
   </div>
 
-  <!-- MAP + RISK CLASSIFICATION -->
+  <!-- MAP + RISK -->
   <div class="grid">
     <div class="card">
       <div class="small">Survey Coverage & Risk Hotspots</div>
@@ -72,13 +112,13 @@
     </div>
   </div>
 
-  <!-- SYSTEM LEVEL RISK -->
+  <!-- SYSTEM RISK -->
   <div class="card" style="margin-top:14px;">
     <div class="small">Individuals Flagged by Health System</div>
     <canvas id="systemChart" height="260"></canvas>
   </div>
 
-  <!-- LOCATION WISE CONVERSION -->
+  <!-- LOCATION CONVERSION -->
   <div class="card" style="margin-top:14px;">
     <div class="small">Location-wise Referral Conversion Rate (%)</div>
     <canvas id="locationChart" height="240"></canvas>
@@ -103,61 +143,33 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-  // Risk Classification
-  new Chart(riskChart,{
-    type:'doughnut',
-    data:{
-      labels:['No Risk','Moderate Risk','High Risk'],
-      datasets:[{data:[3060,1060,860],
-        backgroundColor:['#22c55e','#facc15','#ef4444']}]
-    }
-  });
+  new Chart(riskChart,{type:'doughnut',
+    data:{labels:['No Risk','Moderate Risk','High Risk'],
+    datasets:[{data:[3060,1060,860],
+    backgroundColor:['#22c55e','#facc15','#ef4444']}]} });
 
-  // System Risk
-  new Chart(systemChart,{
-    type:'bar',
-    data:{
-      labels:['Lifestyle','Oral','Breast','Uterine','Chronic','Respiratory','Mental','Eye','Genetic'],
-      datasets:[{data:[1240,980,420,360,760,410,210,530,140],
-        backgroundColor:'#60a5fa'}]
-    },
-    options:{plugins:{legend:{display:false}}}
-  });
+  new Chart(systemChart,{type:'bar',
+    data:{labels:['Lifestyle','Oral','Breast','Uterine','Chronic','Respiratory','Mental','Eye','Genetic'],
+    datasets:[{data:[1240,980,420,360,760,410,210,530,140],
+    backgroundColor:'#60a5fa'}]},
+    options:{plugins:{legend:{display:false}}} });
 
-  // Location Conversion
-  new Chart(locationChart,{
-    type:'bar',
-    data:{
-      labels:['Panchayat A','Panchayat B','Ward 7','Ward 9'],
-      datasets:[{data:[68,54,72,49], backgroundColor:'#06b6d4'}]
-    },
-    options:{
-      plugins:{legend:{display:false}},
-      scales:{y:{ticks:{callback:v=>v+'%'}}}
-    }
-  });
+  new Chart(locationChart,{type:'bar',
+    data:{labels:['Panchayat A','Panchayat B','Ward 7','Ward 9'],
+    datasets:[{data:[68,54,72,49], backgroundColor:'#06b6d4'}]},
+    options:{plugins:{legend:{display:false}},
+    scales:{y:{ticks:{callback:v=>v+'%'}}}} });
 
-  // Funnel
-  new Chart(funnelChart,{
-    type:'bar',
-    data:{
-      labels:['Surveyed','≥1 Risk','High-Risk','Referred','Attended'],
-      datasets:[{data:[4980,1920,860,820,510], backgroundColor:'#06b6d4'}]
-    },
-    options:{indexAxis:'y', plugins:{legend:{display:false}}}
-  });
+  new Chart(funnelChart,{type:'bar',
+    data:{labels:['Surveyed','≥1 Risk','High-Risk','Referred','Attended'],
+    datasets:[{data:[4980,1920,860,820,510], backgroundColor:'#06b6d4'}]},
+    options:{indexAxis:'y', plugins:{legend:{display:false}}} });
 
-  // Lag
-  new Chart(lagChart,{
-    type:'bar',
-    data:{
-      labels:['0–7','8–14','15–30','31–60','60+'],
-      datasets:[{data:[220,160,90,30,10], backgroundColor:'#34d399'}]
-    },
-    options:{plugins:{legend:{display:false}}}
-  });
+  new Chart(lagChart,{type:'bar',
+    data:{labels:['0–7','8–14','15–30','31–60','60+'],
+    datasets:[{data:[220,160,90,30,10], backgroundColor:'#34d399'}]},
+    options:{plugins:{legend:{display:false}}} });
 
-  // MAP
   const map = L.map('map').setView([11.75,76.18],11);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
